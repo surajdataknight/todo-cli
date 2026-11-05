@@ -24,6 +24,31 @@ func addTask(list, text string, priority Priority) error {
 	return nil
 }
 
+// orderedIndices returns the positions of a list's tasks in display order:
+// highest priority first, and tasks with the same priority in the order they
+// were added.
+//
+// The numbers are positions in lists[list], not copies of the tasks, so the
+// display and the numbered commands (done, delete, edit) can share one
+// ordering. Importantly, this function never reorders lists[list] itself:
+// saveTasks keeps writing the file in insertion order, so a number shown today
+// still points at the same task on the next run.
+func orderedIndices(list string) []int {
+	tasks := lists[list]
+	indices := make([]int, len(tasks))
+	for i := range indices {
+		indices[i] = i
+	}
+
+	// sort.SliceStable sorts the positions using a custom "less" function.
+	// Here higher priority comes first (High before Medium before Low).
+	// SliceStable keeps tasks with equal priority in their original order.
+	sort.SliceStable(indices, func(i, j int) bool {
+		return tasks[indices[i]].Priority > tasks[indices[j]].Priority
+	})
+	return indices
+}
+
 func listTasks(list string) {
 	tasks := lists[list]
 	if len(tasks) == 0 {
@@ -31,21 +56,17 @@ func listTasks(list string) {
 		return
 	}
 
-	// sort.Slice orders the slice using a custom "less" function.
-	// Here we put higher priority first (High before Medium before Low).
-	// This sorts the slice in place, so the printed order matches the
-	// order used by done/delete/edit.
-	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].Priority > tasks[j].Priority
-	})
-
 	fmt.Printf("\nTasks in %q:\n", list)
-	for i, t := range tasks {
+	// Walk the sorted positions and print each task with its display number.
+	// `display` is the number the user sees; `index` is where the task really
+	// lives in lists[list], which is what done/delete/edit will use too.
+	for display, index := range orderedIndices(list) {
+		t := tasks[index]
 		marker := " "
 		if t.Done {
 			marker = "x"
 		}
-		fmt.Printf("%d. [%s] %s (priority: %s)\n", i+1, marker, t.Text, t.Priority)
+		fmt.Printf("%d. [%s] %s (priority: %s)\n", display+1, marker, t.Text, t.Priority)
 	}
 	fmt.Printf("Total: %d task(s)\n", len(tasks))
 }
@@ -69,14 +90,15 @@ func listLists() {
 }
 
 func doneTask(list string, num int) error {
-	tasks := lists[list]
-	if num < 1 || num > len(tasks) {
+	// Convert the number the user saw on screen into the task's real position.
+	indices := orderedIndices(list)
+	if num < 1 || num > len(indices) {
 		fmt.Println("Invalid task number.")
 		return errCommandFailed
 	}
-	tasks[num-1].Done = true
-	lists[list] = tasks // write back so the map holds the updated slice
-	fmt.Printf("Marked done in %q: %s\n", list, tasks[num-1].Text)
+	index := indices[num-1]
+	lists[list][index].Done = true
+	fmt.Printf("Marked done in %q: %s\n", list, lists[list][index].Text)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 		return err
@@ -85,16 +107,22 @@ func doneTask(list string, num int) error {
 }
 
 // deleteTask removes task number `num` from `list` and saves to disk.
-// tasks[:num-1] is everything before the removed task,
-// tasks[num:] is everything after it, and append joins them back together.
+// tasks[:index] is everything before the removed task, tasks[index+1:] is
+// everything after it, and append joins them back together.
 func deleteTask(list string, num int) error {
-	tasks := lists[list]
-	if num < 1 || num > len(tasks) {
+	indices := orderedIndices(list)
+	if num < 1 || num > len(indices) {
 		fmt.Println("Invalid task number.")
 		return errCommandFailed
 	}
-	deleted := tasks[num-1].Text
-	tasks = append(tasks[:num-1], tasks[num:]...)
+
+	// Delete the task at its real position so the rest of the slice stays in
+	// insertion order. That keeps the file stable and the remaining numbers
+	// predictable.
+	index := indices[num-1]
+	tasks := lists[list]
+	deleted := tasks[index].Text
+	tasks = append(tasks[:index], tasks[index+1:]...)
 	lists[list] = tasks // write back because append may change the slice's length
 	fmt.Printf("Deleted from %q: %s\n", list, deleted)
 	if err := saveTasks(); err != nil {
@@ -107,14 +135,14 @@ func deleteTask(list string, num int) error {
 // editTask changes the text of task number `num` in `list` to `newText`.
 // The slice element is modified in place.
 func editTask(list string, num int, newText string) error {
-	tasks := lists[list]
-	if num < 1 || num > len(tasks) {
+	indices := orderedIndices(list)
+	if num < 1 || num > len(indices) {
 		fmt.Println("Invalid task number.")
 		return errCommandFailed
 	}
-	oldText := tasks[num-1].Text
-	tasks[num-1].Text = newText
-	lists[list] = tasks // write back so the map holds the updated slice
+	index := indices[num-1]
+	oldText := lists[list][index].Text
+	lists[list][index].Text = newText
 	fmt.Printf("Edited task %d in %q:\n  before: %s\n  after:  %s\n", num, list, oldText, newText)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)

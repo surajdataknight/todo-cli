@@ -84,6 +84,10 @@ todo version
 
 Run `todo help` to see the usage message.
 
+Task numbers are the ones printed by `todo list`. They stay the same between
+runs: tasks are shown highest priority first, equal priorities keep the order
+you added them in, and the data file itself stays in insertion order.
+
 ### Interactive mode
 
 Run `todo` with no arguments in a terminal to get a reusable prompt:
@@ -147,7 +151,7 @@ The text may itself contain `|`; the first three separators are the ones that ma
 
 - `struct`, `slice`, `map[string][]Task`
 - `iota` constants and a `String()` method
-- `sort.Slice` with a custom "less" function
+- `sort.SliceStable` with a custom "less" function
 - `os.Args` with `switch` command dispatch
 - `os.Stdin.Stat` and `os.ModeCharDevice` to detect an interactive terminal
 - a small quote-aware tokenizer built on `strings.Builder`
