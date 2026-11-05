@@ -4,14 +4,59 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
 
+// Priority is how important a task is.
+// iota gives each constant a unique number, starting at 0:
+//
+//	Low  = 0
+//	Medium = 1
+//	High = 2
+type Priority int
+
+const (
+	Low Priority = iota
+	Medium
+	High
+)
+
+// String turns a Priority into a readable word (e.g. High -> "high").
+func (p Priority) String() string {
+	switch p {
+	case Low:
+		return "low"
+	case Medium:
+		return "medium"
+	case High:
+		return "high"
+	default:
+		return "unknown"
+	}
+}
+
+// parsePriority turns a word like "high" into a Priority.
+// The second return value tells whether the word was recognized.
+func parsePriority(s string) (Priority, bool) {
+	switch strings.ToLower(s) {
+	case "low":
+		return Low, true
+	case "medium":
+		return Medium, true
+	case "high":
+		return High, true
+	default:
+		return Medium, false
+	}
+}
+
 // Task is a single to-do item.
 type Task struct {
-	Text string // what the task says
-	Done bool   // true if finished, false if not
+	Text     string    // what the task says
+	Done     bool      // true if finished, false if not
+	Priority Priority  // how important the task is (low/medium/high)
 }
 
 // tasks holds every to-do in memory while the program runs.
@@ -20,9 +65,9 @@ var tasks []Task
 // filename is where we persist tasks so they survive closing the program.
 const filename = "todos.txt"
 
-func addTask(text string) {
-	tasks = append(tasks, Task{Text: text, Done: false})
-	fmt.Println("Added:", text)
+func addTask(text string, priority Priority) {
+	tasks = append(tasks, Task{Text: text, Done: false, Priority: priority})
+	fmt.Printf("Added: %s (priority: %s)\n", text, priority)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 	}
@@ -34,13 +79,21 @@ func listTasks() {
 		return
 	}
 
+	// sort.Slice orders the slice using a custom "less" function.
+	// Here we put higher priority first (High before Medium before Low).
+	// This sorts the slice in place, so the printed order matches the
+	// order used by done/delete.
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].Priority > tasks[j].Priority
+	})
+
 	fmt.Println("\nYour tasks:")
 	for i, t := range tasks {
 		marker := " "
 		if t.Done {
 			marker = "x"
 		}
-		fmt.Printf("%d. [%s] %s\n", i+1, marker, t.Text)
+		fmt.Printf("%d. [%s] %s (priority: %s)\n", i+1, marker, t.Text, t.Priority)
 	}
 	fmt.Printf("Total: %d task(s)\n", len(tasks))
 }
@@ -75,6 +128,7 @@ func deleteTask(num int) {
 
 // loadTasks reads todos.txt and rebuilds the in-memory slice.
 // If the file doesn't exist yet, we simply start empty.
+// Each line now looks like: true|high|Buy milk   (done|priority|text)
 func loadTasks() {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -86,14 +140,14 @@ func loadTasks() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Each line looks like: true|Buy milk
-		parts := strings.SplitN(line, "|", 2)
-		if len(parts) != 2 {
+		parts := strings.SplitN(line, "|", 3)
+		if len(parts) != 3 {
 			continue // skip malformed lines
 		}
 		done, _ := strconv.ParseBool(parts[0])
-		text := parts[1]
-		tasks = append(tasks, Task{Text: text, Done: done})
+		priority, _ := parsePriority(parts[1])
+		text := parts[2]
+		tasks = append(tasks, Task{Text: text, Done: done, Priority: priority})
 	}
 }
 
@@ -107,7 +161,7 @@ func saveTasks() error {
 
 	writer := bufio.NewWriter(file)
 	for _, t := range tasks {
-		line := strconv.FormatBool(t.Done) + "|" + t.Text + "\n"
+		line := strconv.FormatBool(t.Done) + "|" + t.Priority.String() + "|" + t.Text + "\n"
 		if _, err := writer.WriteString(line); err != nil {
 			return err
 		}
@@ -120,10 +174,12 @@ func usage() {
 	fmt.Println("To-Do List CLI")
 	fmt.Println("")
 	fmt.Println("Usage:")
-	fmt.Println("  go run main.go add \"Task text\"   Add a new task")
-	fmt.Println("  go run main.go list              List all tasks")
-	fmt.Println("  go run main.go done <number>     Mark a task as done")
-	fmt.Println("  go run main.go delete <number>   Remove a task")
+	fmt.Println("  go run main.go add \"Task text\" [low|medium|high]   Add a new task")
+	fmt.Println("  go run main.go list                                 List all tasks")
+	fmt.Println("  go run main.go done <number>                        Mark a task as done")
+	fmt.Println("  go run main.go delete <number>                      Remove a task")
+	fmt.Println("")
+	fmt.Println("Priority defaults to medium when not given.")
 }
 
 func main() {
@@ -154,7 +210,18 @@ func main() {
 			fmt.Println("Error: task text cannot be empty.")
 			return
 		}
-		addTask(text)
+		// Optional priority; defaults to Medium.
+		priority := Medium
+		if len(args) >= 3 {
+			p, ok := parsePriority(args[2])
+			if !ok {
+				fmt.Println("Error: unknown priority:", args[2])
+				fmt.Println(`Example: go run main.go add "Buy milk" high`)
+				return
+			}
+			priority = p
+		}
+		addTask(text, priority)
 
 	case "list":
 		listTasks()
