@@ -7,9 +7,10 @@ It supports multiple named lists (e.g. `Work`, `Personal`), task priorities, and
 ## Features
 
 - **Multiple named lists** — tasks are grouped under a list name you choose
+- **View all lists** — `lists` shows every list name and task count
 - **Priorities** — `low`, `medium`, `high` (via `iota` constants), sorted high→low when listed
 - **File persistence** — tasks are saved to `todos.txt` and reloaded on each run (`todos.txt` is gitignored as user data)
-- **Commands** — `add`, `list`, `done`, `delete`, `edit`; every command takes a list name
+- **Commands** — `add`, `list`, `lists`, `done`, `delete`, `edit`; every command takes a list name
 
 ## Prerequisites
 
@@ -27,6 +28,7 @@ go build -o todo.exe .
 ```text
 go run main.go add <list> "Task text" [low|medium|high]   Add a new task to a list
 go run main.go list <list>                                 List all tasks in a list
+go run main.go lists                                       List all lists with task counts
 go run main.go done <list> <number>                        Mark a task as done
 go run main.go delete <list> <number>                      Remove a task
 go run main.go edit <list> <number> "new text"             Change a task's text
@@ -49,6 +51,9 @@ go run main.go list Work
 go run main.go done Work 1
 go run main.go delete Work 2
 go run main.go edit Personal 1 "Gym workout"
+
+# See every list and how many tasks are in each
+go run main.go lists
 ```
 
 Run with no arguments to see the usage message.

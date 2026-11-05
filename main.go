@@ -102,6 +102,24 @@ func listTasks(list string) {
 	fmt.Printf("Total: %d task(s)\n", len(tasks))
 }
 
+// listLists prints every list name and how many tasks are in each.
+func listLists() {
+	if len(lists) == 0 {
+		fmt.Println("No lists yet. Add a task to create one.")
+		return
+	}
+
+	fmt.Println("All lists:")
+	for listName, tasks := range lists {
+		count := len(tasks)
+		label := "tasks"
+		if count == 1 {
+			label = "task"
+		}
+		fmt.Printf("- %s (%d %s)\n", listName, count, label)
+	}
+}
+
 func doneTask(list string, num int) {
 	tasks := lists[list]
 	if num < 1 || num > len(tasks) {
@@ -209,6 +227,7 @@ func usage() {
 	fmt.Println("  go run main.go done <list> <number>                        Mark a task as done")
 	fmt.Println("  go run main.go delete <list> <number>                      Remove a task")
 	fmt.Println("  go run main.go edit <list> <number> \"new text\"             Change a task's text")
+	fmt.Println("  go run main.go lists                                       List all lists")
 	fmt.Println("")
 	fmt.Println("Priority defaults to medium when not given.")
 	fmt.Println("Example: go run main.go add Work \"Buy milk\" high")
@@ -310,6 +329,9 @@ func main() {
 			return
 		}
 		editTask(list, num, newText)
+
+	case "lists":
+		listLists()
 
 	default:
 		fmt.Println("Unknown command:", command)
