@@ -73,7 +73,3 @@ The file is created automatically on the first `add`/`done`/`delete`/`edit` and 
 - `strings.TrimSpace` input validation
 - `bufio.Scanner`/`Writer`, `os.Create`/`Open`, `defer file.Close()`
 - `strconv.Atoi`, `strconv.FormatBool`, `strconv.ParseBool`
-
-## License
-
-MIT
