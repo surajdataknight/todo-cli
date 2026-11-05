@@ -46,6 +46,7 @@ todo                                             Start the interactive prompt
 todo add <list> "Task text" [low|medium|high]   Add a new task to a list
 todo list <list>                                 List all tasks in a list
 todo lists                                       List all lists with task counts
+todo all                                         List all tasks in every list
 todo where                                       Show the data file and task count
 todo done <list> <number>                        Mark a task as done
 todo delete <list> <number>                      Remove a task
@@ -74,6 +75,9 @@ todo edit Personal 1 "Gym workout"
 
 # See every list and how many tasks are in each
 todo lists
+
+# See every list and every task in each list
+todo all
 
 # Show the data file and how many tasks are stored
 todo where

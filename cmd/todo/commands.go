@@ -89,6 +89,43 @@ func listLists() {
 	}
 }
 
+// listAllTasks prints every list and every task in it, one list after another.
+// Lists are shown in alphabetical order so the output is stable across runs
+// (Go maps iterate in a random order). Within a list, tasks are sorted by
+// priority — highest first — just like `todo list`.
+func listAllTasks() {
+	if len(lists) == 0 {
+		fmt.Println("No lists yet. Add a task to create one.")
+		return
+	}
+
+	fmt.Println("All tasks:")
+
+	names := make([]string, 0, len(lists))
+	for name := range lists {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, listName := range names {
+		tasks := lists[listName]
+		fmt.Printf("\n%s:\n", listName)
+		if len(tasks) == 0 {
+			fmt.Println("  (no tasks)")
+			continue
+		}
+		for display, index := range orderedIndices(listName) {
+			t := tasks[index]
+			marker := " "
+			if t.Done {
+				marker = "x"
+			}
+			fmt.Printf("%d. [%s] %s (priority: %s)\n", display+1, marker, t.Text, t.Priority)
+		}
+		fmt.Printf("Total: %d task(s)\n", len(tasks))
+	}
+}
+
 func doneTask(list string, num int) error {
 	// Convert the number the user saw on screen into the task's real position.
 	indices := orderedIndices(list)
@@ -174,6 +211,7 @@ func usage() {
 	fmt.Println("  todo delete <list> <number>                      Remove a task")
 	fmt.Println("  todo edit <list> <number> \"new text\"             Change a task's text")
 	fmt.Println("  todo lists                                       List all lists")
+	fmt.Println("  todo all                                        List all tasks in every list")
 	fmt.Println("  todo where                                       Show the data file and task count")
 	fmt.Println("  todo version                                     Show the version")
 	fmt.Println("  todo help                                        Show this help")
@@ -276,6 +314,10 @@ func run(args []string) error {
 
 	case "lists":
 		listLists()
+		return nil
+
+	case "all":
+		listAllTasks()
 		return nil
 
 	case "where":
