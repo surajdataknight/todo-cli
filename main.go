@@ -42,6 +42,7 @@ func listTasks() {
 		}
 		fmt.Printf("%d. [%s] %s\n", i+1, marker, t.Text)
 	}
+	fmt.Printf("Total: %d task(s)\n", len(tasks))
 }
 
 func doneTask(num int) {
@@ -51,6 +52,22 @@ func doneTask(num int) {
 	}
 	tasks[num-1].Done = true
 	fmt.Println("Marked done:", tasks[num-1].Text)
+	if err := saveTasks(); err != nil {
+		fmt.Println("Warning: could not save tasks:", err)
+	}
+}
+
+// deleteTask removes task number `num` from the list and saves to disk.
+// tasks[:num-1] is everything before the removed task,
+// tasks[num:] is everything after it, and append joins them back together.
+func deleteTask(num int) {
+	if num < 1 || num > len(tasks) {
+		fmt.Println("Invalid task number.")
+		return
+	}
+	deleted := tasks[num-1].Text
+	tasks = append(tasks[:num-1], tasks[num:]...)
+	fmt.Println("Deleted:", deleted)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 	}
@@ -106,6 +123,7 @@ func usage() {
 	fmt.Println("  go run main.go add \"Task text\"   Add a new task")
 	fmt.Println("  go run main.go list              List all tasks")
 	fmt.Println("  go run main.go done <number>     Mark a task as done")
+	fmt.Println("  go run main.go delete <number>   Remove a task")
 }
 
 func main() {
@@ -131,7 +149,12 @@ func main() {
 			fmt.Println(`Example: go run main.go add "Buy milk"`)
 			return
 		}
-		addTask(args[1])
+		text := strings.TrimSpace(args[1])
+		if text == "" {
+			fmt.Println("Error: task text cannot be empty.")
+			return
+		}
+		addTask(text)
 
 	case "list":
 		listTasks()
@@ -148,6 +171,19 @@ func main() {
 			return
 		}
 		doneTask(num)
+
+	case "delete":
+		if len(args) < 2 {
+			fmt.Println("Error: delete needs a task number.")
+			fmt.Println("Example: go run main.go delete 1")
+			return
+		}
+		num, err := strconv.Atoi(args[1])
+		if err != nil {
+			fmt.Println("Error: task number must be a number.")
+			return
+		}
+		deleteTask(num)
 
 	default:
 		fmt.Println("Unknown command:", command)
