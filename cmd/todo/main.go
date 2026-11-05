@@ -22,6 +22,19 @@ func main() {
 	// Load any saved lists before doing anything.
 	loadTasks()
 
+	// With no arguments, open the interactive prompt when the command was
+	// typed at a terminal. If standard input is a pipe or a redirected file
+	// (for example `todo < commands.txt`), print the usage instead so the
+	// program never waits for input that will not arrive.
+	if len(os.Args) == 1 {
+		if stdinIsTerminal() {
+			startREPL()
+			return
+		}
+		_ = run(nil)
+		return
+	}
+
 	// os.Args holds the command-line arguments:
 	//   os.Args[0] is the program name,
 	//   os.Args[1] is the command (add/list/done),
@@ -32,4 +45,15 @@ func main() {
 	if err := run(os.Args[1:]); err != nil {
 		os.Exit(1)
 	}
+}
+
+// stdinIsTerminal reports whether standard input is connected to a terminal.
+// A pipe or a redirected file does not have the ModeCharDevice bit set, which
+// is exactly when the interactive prompt must stay closed.
+func stdinIsTerminal() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }

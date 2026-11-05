@@ -20,6 +20,9 @@ func startREPL() {
 		if !scanner.Scan() {
 			// Ctrl+D / Ctrl+Z, or the end of piped input.
 			fmt.Println()
+			if err := scanner.Err(); err != nil {
+				fmt.Fprintln(os.Stderr, "Error reading input:", err)
+			}
 			return
 		}
 

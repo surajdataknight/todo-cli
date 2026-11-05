@@ -2,11 +2,12 @@
 
 A beginner-friendly command-line To-Do List written in Go.
 
-It supports multiple named lists (e.g. `Work`, `Personal`), task priorities, and file persistence — all driven by `os.Args` commands with `switch` dispatch.
+It supports multiple named lists (e.g. `Work`, `Personal`), task priorities, and file persistence. Every command works both as a one-shot `todo ...` call and at an interactive `todo>` prompt.
 
 ## Features
 
 - **One command** — install once, then run `todo` from any folder
+- **Interactive mode** — run `todo` on its own for a `todo>` prompt that accepts the same commands
 - **One data file** — tasks live in your user config folder, independent of the current directory
 - **Multiple named lists** — tasks are grouped under a list name you choose
 - **View all lists** — `lists` shows every list name and task count
@@ -41,6 +42,7 @@ go install ./cmd/todo
 ## Usage
 
 ```text
+todo                                             Start the interactive prompt
 todo add <list> "Task text" [low|medium|high]   Add a new task to a list
 todo list <list>                                 List all tasks in a list
 todo lists                                       List all lists with task counts
@@ -80,7 +82,34 @@ todo where
 todo version
 ```
 
-Run `todo help` (or `todo` with no arguments) to see the usage message.
+Run `todo help` to see the usage message.
+
+### Interactive mode
+
+Run `todo` with no arguments in a terminal to get a reusable prompt:
+
+```text
+$ todo
+Interactive mode. Type "help" for commands, "exit" to quit.
+todo> add Work "Buy milk" high
+Added to "Work": Buy milk (priority: high)
+todo> list Work
+
+Tasks in "Work":
+1. [ ] Buy milk (priority: high)
+Total: 1 task(s)
+todo> exit
+```
+
+The prompt accepts exactly the same commands as the one-shot form, without the
+leading `todo`. Double or single quotes keep text with spaces together, so
+`add Work "buy milk (2%)" high` stores the full text. A mistyped command prints
+an error and returns to the prompt; `exit`, `quit`, and end-of-input (Ctrl+D, or
+Ctrl+Z then Enter on Windows) leave cleanly.
+
+When input comes from a pipe or a redirected file (`todo < commands.txt`),
+`todo` prints the help instead of opening the prompt, so it never waits for
+input that will not arrive.
 
 ## Data location
 
@@ -120,6 +149,8 @@ The text may itself contain `|`; the first three separators are the ones that ma
 - `iota` constants and a `String()` method
 - `sort.Slice` with a custom "less" function
 - `os.Args` with `switch` command dispatch
+- `os.Stdin.Stat` and `os.ModeCharDevice` to detect an interactive terminal
+- a small quote-aware tokenizer built on `strings.Builder`
 - `os.UserConfigDir`, `filepath.Join`, and `os.MkdirAll` for portable paths
 - `strings.TrimSpace` input validation
 - `bufio.Scanner`/`Writer`, `os.Create`/`Open`, `defer file.Close()`

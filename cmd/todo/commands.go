@@ -151,6 +151,7 @@ func usage() {
 	fmt.Println("  todo help                                        Show this help")
 	fmt.Println("")
 	fmt.Println("Priority defaults to medium when not given.")
+	fmt.Println("In a terminal, run todo with no arguments to start the interactive prompt.")
 	fmt.Println("Example: todo add Work \"Buy milk\" high")
 }
 
