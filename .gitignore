@@ -5,5 +5,8 @@
 *.so
 *.dylib
 
+# Application data (user-specific, generated at runtime)
+todos.txt
+
 # Go workspace
 go.work
