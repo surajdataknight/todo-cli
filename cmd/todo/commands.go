@@ -123,6 +123,18 @@ func editTask(list string, num int, newText string) error {
 	return nil
 }
 
+// where prints the resolved data file and how many tasks it holds.
+// It is the quickest way to confirm that the installed command uses one file
+// no matter which folder it runs from.
+func showWhere() {
+	total := 0
+	for _, tasks := range lists {
+		total += len(tasks)
+	}
+	fmt.Println("Data file:", dataFile)
+	fmt.Printf("Total tasks: %d\n", total)
+}
+
 // usage prints how to use the program.
 func usage() {
 	fmt.Println("To-Do List CLI")
@@ -134,6 +146,7 @@ func usage() {
 	fmt.Println("  todo delete <list> <number>                      Remove a task")
 	fmt.Println("  todo edit <list> <number> \"new text\"             Change a task's text")
 	fmt.Println("  todo lists                                       List all lists")
+	fmt.Println("  todo where                                       Show the data file and task count")
 	fmt.Println("  todo version                                     Show the version")
 	fmt.Println("  todo help                                        Show this help")
 	fmt.Println("")
@@ -234,6 +247,10 @@ func run(args []string) error {
 
 	case "lists":
 		listLists()
+		return nil
+
+	case "where":
+		showWhere()
 		return nil
 
 	case "version":

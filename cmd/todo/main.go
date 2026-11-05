@@ -1,6 +1,9 @@
 package main
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 // version is the human-readable build version.
 // Release builds can replace it with:
@@ -9,6 +12,13 @@ import "os"
 var version = "dev"
 
 func main() {
+	// Work out where tasks live before reading them. On the first run this
+	// also imports a todos.txt left behind by an older version.
+	if err := initStorage(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error: could not find the todo data folder:", err)
+		os.Exit(1)
+	}
+
 	// Load any saved lists before doing anything.
 	loadTasks()
 
