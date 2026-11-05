@@ -20,7 +20,6 @@ var tasks []Task
 // filename is where we persist tasks so they survive closing the program.
 const filename = "todos.txt"
 
-// addTask appends a new task and saves to disk immediately.
 func addTask(text string) {
 	tasks = append(tasks, Task{Text: text, Done: false})
 	fmt.Println("Added:", text)
@@ -29,7 +28,6 @@ func addTask(text string) {
 	}
 }
 
-// listTasks prints every task with a number and a status marker.
 func listTasks() {
 	if len(tasks) == 0 {
 		fmt.Println("No tasks yet.")
@@ -46,7 +44,6 @@ func listTasks() {
 	}
 }
 
-// doneTask marks task number `num` as finished and saves to disk.
 func doneTask(num int) {
 	if num < 1 || num > len(tasks) {
 		fmt.Println("Invalid task number.")
@@ -101,62 +98,59 @@ func saveTasks() error {
 	return writer.Flush() // push buffered data to disk
 }
 
-// printMenu shows the options and prompts for a choice.
-func printMenu() {
-	fmt.Println("\n--- To-Do List ---")
-	fmt.Println("1. Add task")
-	fmt.Println("2. List tasks")
-	fmt.Println("3. Mark task done")
-	fmt.Println("4. Quit")
-	fmt.Print("Choose: ")
-}
-
-// readLine reads one full line of input (supports spaces).
-func readLine() string {
-	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-	return strings.TrimSpace(line)
+// usage prints how to run the program.
+func usage() {
+	fmt.Println("To-Do List CLI")
+	fmt.Println("")
+	fmt.Println("Usage:")
+	fmt.Println("  go run main.go add \"Task text\"   Add a new task")
+	fmt.Println("  go run main.go list              List all tasks")
+	fmt.Println("  go run main.go done <number>     Mark a task as done")
 }
 
 func main() {
-	// Load any saved tasks before showing the menu.
+	// Load any saved tasks before doing anything.
 	loadTasks()
 
-	for {
-		printMenu()
+	// os.Args holds the command-line arguments:
+	//   os.Args[0] is the program name,
+	//   os.Args[1] is the command (add/list/done),
+	//   os.Args[2] and beyond are the command's arguments.
+	args := os.Args[1:]
 
-		choiceStr := readLine()
-		choice, err := strconv.Atoi(choiceStr)
+	if len(args) == 0 {
+		usage()
+		return
+	}
+
+	// switch picks which command to run based on the first argument.
+	switch command := args[0]; command {
+	case "add":
+		if len(args) < 2 {
+			fmt.Println("Error: add needs task text.")
+			fmt.Println(`Example: go run main.go add "Buy milk"`)
+			return
+		}
+		addTask(args[1])
+
+	case "list":
+		listTasks()
+
+	case "done":
+		if len(args) < 2 {
+			fmt.Println("Error: done needs a task number.")
+			fmt.Println("Example: go run main.go done 1")
+			return
+		}
+		num, err := strconv.Atoi(args[1])
 		if err != nil {
-			fmt.Println("Please enter a number.")
-			continue
+			fmt.Println("Error: task number must be a number.")
+			return
 		}
+		doneTask(num)
 
-		if choice == 4 {
-			fmt.Println("Goodbye!")
-			break
-		}
-
-		if choice == 1 {
-			fmt.Print("Task text: ")
-			text := readLine()
-			if text == "" {
-				fmt.Println("Task text cannot be empty.")
-				continue
-			}
-			addTask(text)
-		} else if choice == 2 {
-			listTasks()
-		} else if choice == 3 {
-			fmt.Print("Task number: ")
-			numStr := readLine()
-			num, err := strconv.Atoi(numStr)
-			if err != nil {
-				fmt.Println("Please enter a valid number.")
-				continue
-			}
-			doneTask(num)
-		} else {
-			fmt.Println("Invalid choice.")
-		}
+	default:
+		fmt.Println("Unknown command:", command)
+		usage()
 	}
 }
