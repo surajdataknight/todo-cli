@@ -59,35 +59,39 @@ type Task struct {
 	Priority Priority  // how important the task is (low/medium/high)
 }
 
-// tasks holds every to-do in memory while the program runs.
-var tasks []Task
+// lists maps a list name (e.g. "Work") to that list's tasks.
+// Replacing the single tasks slice with a map lets us keep many named lists.
+var lists map[string][]Task
 
 // filename is where we persist tasks so they survive closing the program.
 const filename = "todos.txt"
 
-func addTask(text string, priority Priority) {
-	tasks = append(tasks, Task{Text: text, Done: false, Priority: priority})
-	fmt.Printf("Added: %s (priority: %s)\n", text, priority)
+func addTask(list, text string, priority Priority) {
+	// lists[list] returns a nil slice when the list does not exist yet,
+	// and append works on a nil slice, so this creates the list automatically.
+	lists[list] = append(lists[list], Task{Text: text, Done: false, Priority: priority})
+	fmt.Printf("Added to %q: %s (priority: %s)\n", list, text, priority)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 	}
 }
 
-func listTasks() {
+func listTasks(list string) {
+	tasks := lists[list]
 	if len(tasks) == 0 {
-		fmt.Println("No tasks yet.")
+		fmt.Printf("No tasks in list %q yet.\n", list)
 		return
 	}
 
 	// sort.Slice orders the slice using a custom "less" function.
 	// Here we put higher priority first (High before Medium before Low).
 	// This sorts the slice in place, so the printed order matches the
-	// order used by done/delete.
+	// order used by done/delete/edit.
 	sort.Slice(tasks, func(i, j int) bool {
 		return tasks[i].Priority > tasks[j].Priority
 	})
 
-	fmt.Println("\nYour tasks:")
+	fmt.Printf("\nTasks in %q:\n", list)
 	for i, t := range tasks {
 		marker := " "
 		if t.Done {
@@ -98,38 +102,61 @@ func listTasks() {
 	fmt.Printf("Total: %d task(s)\n", len(tasks))
 }
 
-func doneTask(num int) {
+func doneTask(list string, num int) {
+	tasks := lists[list]
 	if num < 1 || num > len(tasks) {
 		fmt.Println("Invalid task number.")
 		return
 	}
 	tasks[num-1].Done = true
-	fmt.Println("Marked done:", tasks[num-1].Text)
+	lists[list] = tasks // write back so the map holds the updated slice
+	fmt.Printf("Marked done in %q: %s\n", list, tasks[num-1].Text)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 	}
 }
 
-// deleteTask removes task number `num` from the list and saves to disk.
+// deleteTask removes task number `num` from `list` and saves to disk.
 // tasks[:num-1] is everything before the removed task,
 // tasks[num:] is everything after it, and append joins them back together.
-func deleteTask(num int) {
+func deleteTask(list string, num int) {
+	tasks := lists[list]
 	if num < 1 || num > len(tasks) {
 		fmt.Println("Invalid task number.")
 		return
 	}
 	deleted := tasks[num-1].Text
 	tasks = append(tasks[:num-1], tasks[num:]...)
-	fmt.Println("Deleted:", deleted)
+	lists[list] = tasks // write back because append may change the slice's length
+	fmt.Printf("Deleted from %q: %s\n", list, deleted)
 	if err := saveTasks(); err != nil {
 		fmt.Println("Warning: could not save tasks:", err)
 	}
 }
 
-// loadTasks reads todos.txt and rebuilds the in-memory slice.
+// editTask changes the text of task number `num` in `list` to `newText`.
+// The slice element is modified in place.
+func editTask(list string, num int, newText string) {
+	tasks := lists[list]
+	if num < 1 || num > len(tasks) {
+		fmt.Println("Invalid task number.")
+		return
+	}
+	oldText := tasks[num-1].Text
+	tasks[num-1].Text = newText
+	lists[list] = tasks // write back so the map holds the updated slice
+	fmt.Printf("Edited task %d in %q:\n  before: %s\n  after:  %s\n", num, list, oldText, newText)
+	if err := saveTasks(); err != nil {
+		fmt.Println("Warning: could not save tasks:", err)
+	}
+}
+
+// loadTasks reads todos.txt and rebuilds the in-memory map.
+// Each line now looks like: Work|true|high|Buy milk   (list|done|priority|text)
+// SplitN with 4 keeps the task text intact even if it contains "|".
 // If the file doesn't exist yet, we simply start empty.
-// Each line now looks like: true|high|Buy milk   (done|priority|text)
 func loadTasks() {
+	lists = make(map[string][]Task)
 	file, err := os.Open(filename)
 	if err != nil {
 		// No saved file yet — that's fine, first run.
@@ -140,18 +167,19 @@ func loadTasks() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.SplitN(line, "|", 3)
-		if len(parts) != 3 {
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
 			continue // skip malformed lines
 		}
-		done, _ := strconv.ParseBool(parts[0])
-		priority, _ := parsePriority(parts[1])
-		text := parts[2]
-		tasks = append(tasks, Task{Text: text, Done: done, Priority: priority})
+		listName := parts[0]
+		done, _ := strconv.ParseBool(parts[1])
+		priority, _ := parsePriority(parts[2])
+		text := parts[3]
+		lists[listName] = append(lists[listName], Task{Text: text, Done: done, Priority: priority})
 	}
 }
 
-// saveTasks writes the current in-memory tasks to todos.txt.
+// saveTasks writes the current in-memory lists to todos.txt.
 func saveTasks() error {
 	file, err := os.Create(filename) // creates or overwrites
 	if err != nil {
@@ -160,10 +188,12 @@ func saveTasks() error {
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
-	for _, t := range tasks {
-		line := strconv.FormatBool(t.Done) + "|" + t.Priority.String() + "|" + t.Text + "\n"
-		if _, err := writer.WriteString(line); err != nil {
-			return err
+	for listName, tasks := range lists {
+		for _, t := range tasks {
+			line := listName + "|" + strconv.FormatBool(t.Done) + "|" + t.Priority.String() + "|" + t.Text + "\n"
+			if _, err := writer.WriteString(line); err != nil {
+				return err
+			}
 		}
 	}
 	return writer.Flush() // push buffered data to disk
@@ -174,16 +204,18 @@ func usage() {
 	fmt.Println("To-Do List CLI")
 	fmt.Println("")
 	fmt.Println("Usage:")
-	fmt.Println("  go run main.go add \"Task text\" [low|medium|high]   Add a new task")
-	fmt.Println("  go run main.go list                                 List all tasks")
-	fmt.Println("  go run main.go done <number>                        Mark a task as done")
-	fmt.Println("  go run main.go delete <number>                      Remove a task")
+	fmt.Println("  go run main.go add <list> \"Task text\" [low|medium|high]   Add a new task to a list")
+	fmt.Println("  go run main.go list <list>                                 List all tasks in a list")
+	fmt.Println("  go run main.go done <list> <number>                        Mark a task as done")
+	fmt.Println("  go run main.go delete <list> <number>                      Remove a task")
+	fmt.Println("  go run main.go edit <list> <number> \"new text\"             Change a task's text")
 	fmt.Println("")
 	fmt.Println("Priority defaults to medium when not given.")
+	fmt.Println("Example: go run main.go add Work \"Buy milk\" high")
 }
 
 func main() {
-	// Load any saved tasks before doing anything.
+	// Load any saved lists before doing anything.
 	loadTasks()
 
 	// os.Args holds the command-line arguments:
@@ -200,57 +232,84 @@ func main() {
 	// switch picks which command to run based on the first argument.
 	switch command := args[0]; command {
 	case "add":
-		if len(args) < 2 {
-			fmt.Println("Error: add needs task text.")
-			fmt.Println(`Example: go run main.go add "Buy milk"`)
+		if len(args) < 3 {
+			fmt.Println("Error: add needs a list name and task text.")
+			fmt.Println(`Example: go run main.go add Work "Buy milk"`)
 			return
 		}
-		text := strings.TrimSpace(args[1])
+		list := args[1]
+		text := strings.TrimSpace(args[2])
 		if text == "" {
 			fmt.Println("Error: task text cannot be empty.")
 			return
 		}
 		// Optional priority; defaults to Medium.
 		priority := Medium
-		if len(args) >= 3 {
-			p, ok := parsePriority(args[2])
+		if len(args) >= 4 {
+			p, ok := parsePriority(args[3])
 			if !ok {
-				fmt.Println("Error: unknown priority:", args[2])
-				fmt.Println(`Example: go run main.go add "Buy milk" high`)
+				fmt.Println("Error: unknown priority:", args[3])
+				fmt.Println(`Example: go run main.go add Work "Buy milk" high`)
 				return
 			}
 			priority = p
 		}
-		addTask(text, priority)
+		addTask(list, text, priority)
 
 	case "list":
-		listTasks()
+		if len(args) < 2 {
+			fmt.Println("Error: list needs a list name.")
+			fmt.Println("Example: go run main.go list Work")
+			return
+		}
+		listTasks(args[1])
 
 	case "done":
-		if len(args) < 2 {
-			fmt.Println("Error: done needs a task number.")
-			fmt.Println("Example: go run main.go done 1")
+		if len(args) < 3 {
+			fmt.Println("Error: done needs a list name and task number.")
+			fmt.Println("Example: go run main.go done Work 1")
 			return
 		}
-		num, err := strconv.Atoi(args[1])
+		list := args[1]
+		num, err := strconv.Atoi(args[2])
 		if err != nil {
 			fmt.Println("Error: task number must be a number.")
 			return
 		}
-		doneTask(num)
+		doneTask(list, num)
 
 	case "delete":
-		if len(args) < 2 {
-			fmt.Println("Error: delete needs a task number.")
-			fmt.Println("Example: go run main.go delete 1")
+		if len(args) < 3 {
+			fmt.Println("Error: delete needs a list name and task number.")
+			fmt.Println("Example: go run main.go delete Work 1")
 			return
 		}
-		num, err := strconv.Atoi(args[1])
+		list := args[1]
+		num, err := strconv.Atoi(args[2])
 		if err != nil {
 			fmt.Println("Error: task number must be a number.")
 			return
 		}
-		deleteTask(num)
+		deleteTask(list, num)
+
+	case "edit":
+		if len(args) < 4 {
+			fmt.Println("Error: edit needs a list name, task number, and new text.")
+			fmt.Println(`Example: go run main.go edit Work 1 "Buy milk (2%)"`)
+			return
+		}
+		list := args[1]
+		num, err := strconv.Atoi(args[2])
+		if err != nil {
+			fmt.Println("Error: task number must be a number.")
+			return
+		}
+		newText := strings.TrimSpace(args[3])
+		if newText == "" {
+			fmt.Println("Error: new text cannot be empty.")
+			return
+		}
+		editTask(list, num, newText)
 
 	default:
 		fmt.Println("Unknown command:", command)
