@@ -283,7 +283,7 @@ func run(args []string) error {
 		return nil
 
 	case "version":
-		fmt.Println("todo", version)
+		fmt.Println("todo", buildVersion())
 		return nil
 
 	case "help":
