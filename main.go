@@ -1,22 +1,32 @@
 package main
 
-import "fmt"
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
 
 // Task is a single to-do item.
-// A struct lets us group related data together under one name.
 type Task struct {
 	Text string // what the task says
 	Done bool   // true if finished, false if not
 }
 
 // tasks holds every to-do in memory while the program runs.
-// It starts empty and is wiped when the program quits (Phase 1).
 var tasks []Task
 
-// addTask appends a new task to the slice.
+// filename is where we persist tasks so they survive closing the program.
+const filename = "todos.txt"
+
+// addTask appends a new task and saves to disk immediately.
 func addTask(text string) {
 	tasks = append(tasks, Task{Text: text, Done: false})
 	fmt.Println("Added:", text)
+	if err := saveTasks(); err != nil {
+		fmt.Println("Warning: could not save tasks:", err)
+	}
 }
 
 // listTasks prints every task with a number and a status marker.
@@ -32,13 +42,11 @@ func listTasks() {
 		if t.Done {
 			marker = "x"
 		}
-		// i starts at 0, so we show i+1 for a human-friendly number
 		fmt.Printf("%d. [%s] %s\n", i+1, marker, t.Text)
 	}
 }
 
-// doneTask marks task number `num` as finished.
-// The real slice index is num-1 because humans count from 1.
+// doneTask marks task number `num` as finished and saves to disk.
 func doneTask(num int) {
 	if num < 1 || num > len(tasks) {
 		fmt.Println("Invalid task number.")
@@ -46,6 +54,51 @@ func doneTask(num int) {
 	}
 	tasks[num-1].Done = true
 	fmt.Println("Marked done:", tasks[num-1].Text)
+	if err := saveTasks(); err != nil {
+		fmt.Println("Warning: could not save tasks:", err)
+	}
+}
+
+// loadTasks reads todos.txt and rebuilds the in-memory slice.
+// If the file doesn't exist yet, we simply start empty.
+func loadTasks() {
+	file, err := os.Open(filename)
+	if err != nil {
+		// No saved file yet — that's fine, first run.
+		return
+	}
+	defer file.Close() // make sure the file closes when we leave this function
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Each line looks like: true|Buy milk
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) != 2 {
+			continue // skip malformed lines
+		}
+		done, _ := strconv.ParseBool(parts[0])
+		text := parts[1]
+		tasks = append(tasks, Task{Text: text, Done: done})
+	}
+}
+
+// saveTasks writes the current in-memory tasks to todos.txt.
+func saveTasks() error {
+	file, err := os.Create(filename) // creates or overwrites
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	for _, t := range tasks {
+		line := strconv.FormatBool(t.Done) + "|" + t.Text + "\n"
+		if _, err := writer.WriteString(line); err != nil {
+			return err
+		}
+	}
+	return writer.Flush() // push buffered data to disk
 }
 
 // printMenu shows the options and prompts for a choice.
@@ -58,36 +111,49 @@ func printMenu() {
 	fmt.Print("Choose: ")
 }
 
+// readLine reads one full line of input (supports spaces).
+func readLine() string {
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.TrimSpace(line)
+}
+
 func main() {
+	// Load any saved tasks before showing the menu.
+	loadTasks()
+
 	for {
 		printMenu()
 
-		var choice int
-		_, err := fmt.Scan(&choice)
+		choiceStr := readLine()
+		choice, err := strconv.Atoi(choiceStr)
 		if err != nil {
 			fmt.Println("Please enter a number.")
-			// throw away the bad input so the loop doesn't get stuck
-			var dummy string
-			fmt.Scan(&dummy)
 			continue
 		}
 
 		if choice == 4 {
 			fmt.Println("Goodbye!")
-			break // exit the for loop, ending the program
+			break
 		}
 
 		if choice == 1 {
 			fmt.Print("Task text: ")
-			var text string
-			fmt.Scan(&text)
+			text := readLine()
+			if text == "" {
+				fmt.Println("Task text cannot be empty.")
+				continue
+			}
 			addTask(text)
 		} else if choice == 2 {
 			listTasks()
 		} else if choice == 3 {
 			fmt.Print("Task number: ")
-			var num int
-			fmt.Scan(&num)
+			numStr := readLine()
+			num, err := strconv.Atoi(numStr)
+			if err != nil {
+				fmt.Println("Please enter a valid number.")
+				continue
+			}
 			doneTask(num)
 		} else {
 			fmt.Println("Invalid choice.")
