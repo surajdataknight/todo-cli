@@ -6,6 +6,7 @@ It supports multiple named lists (e.g. `Work`, `Personal`), task priorities, and
 
 ## Features
 
+- **One command** — install once, then run `todo` from any folder
 - **Multiple named lists** — tasks are grouped under a list name you choose
 - **View all lists** — `lists` shows every list name and task count
 - **Priorities** — `low`, `medium`, `high` (via `iota` constants), sorted high→low when listed
@@ -16,22 +17,37 @@ It supports multiple named lists (e.g. `Work`, `Personal`), task priorities, and
 
 Go 1.22 or later.
 
-## Build
+## Install
 
 ```powershell
+go install github.com/surajdataknight/todo-cli/cmd/todo@latest
+```
+
+This downloads, builds, and copies the `todo` executable into your Go bin directory — `go env GOBIN` if it is set, otherwise `$(go env GOPATH)\bin`. Make sure that directory is on your `PATH`, then confirm the install:
+
+```powershell
+todo version
+```
+
+To build from a local clone instead:
+
+```powershell
+git clone https://github.com/surajdataknight/todo-cli.git
 cd todo-cli
-go build -o todo.exe ./cmd/todo
+go install ./cmd/todo
 ```
 
 ## Usage
 
 ```text
-go run ./cmd/todo add <list> "Task text" [low|medium|high]   Add a new task to a list
-go run ./cmd/todo list <list>                                 List all tasks in a list
-go run ./cmd/todo lists                                       List all lists with task counts
-go run ./cmd/todo done <list> <number>                        Mark a task as done
-go run ./cmd/todo delete <list> <number>                      Remove a task
-go run ./cmd/todo edit <list> <number> "new text"             Change a task's text
+todo add <list> "Task text" [low|medium|high]   Add a new task to a list
+todo list <list>                                 List all tasks in a list
+todo lists                                       List all lists with task counts
+todo done <list> <number>                        Mark a task as done
+todo delete <list> <number>                      Remove a task
+todo edit <list> <number> "new text"             Change a task's text
+todo version                                     Show the version
+todo help                                        Show this help
 ```
 
 Priority defaults to `medium` when not given.
@@ -40,23 +56,26 @@ Priority defaults to `medium` when not given.
 
 ```powershell
 # Add tasks to different lists
-go run ./cmd/todo add Work "Buy milk" high
-go run ./cmd/todo add Work "Email boss"
-go run ./cmd/todo add Personal "Gym"
+todo add Work "Buy milk" high
+todo add Work "Email boss"
+todo add Personal "Gym"
 
 # List a list (sorted by priority)
-go run ./cmd/todo list Work
+todo list Work
 
 # Mark task 1 done, delete task 2, edit task 3's text
-go run ./cmd/todo done Work 1
-go run ./cmd/todo delete Work 2
-go run ./cmd/todo edit Personal 1 "Gym workout"
+todo done Work 1
+todo delete Work 2
+todo edit Personal 1 "Gym workout"
 
 # See every list and how many tasks are in each
-go run ./cmd/todo lists
+todo lists
+
+# Check which version is installed
+todo version
 ```
 
-Run with no arguments to see the usage message.
+Run `todo help` (or `todo` with no arguments) to see the usage message.
 
 ## Data format
 
